@@ -8,7 +8,7 @@ import sys,requests,json
 
 def luna_login(session):
     """Authenticate the requests Session object to Luna by posting user/pass to the login form"""
-    form_url = 'http://localhost/las/login.htm'
+    form_url = 'http://images.is.ed.ac.uk/las/login.htm'
     form_payload = {'username': 'lunauser',
                     'password': 'yourpasswordhere'}
 
@@ -18,12 +18,12 @@ def luna_login(session):
         return True
     else:
         print("Login Failed: %s - %s"%(login_attempt.status_code, login_attempt.reason))
-        sys.exit(1)
+        return False
 
 
 def solr_query(session, query, limit = 0, fields=[], sort=[]):
     """Construct a query, send it to Solr, paginate through results and return"""
-    solr_url = 'http://localhost/las/solr/select'
+    solr_url = 'http://images.is.ed.ac.uk/las/solr/select'
     base_qstring = '?indent=on&version=2.2&qt=standard&wt=json'
     start = 0
     results = []
@@ -86,7 +86,10 @@ if __name__ == "__main__":
 
     print("Session initialised, logging into LUNA")
     try:
-        if luna_login(s): print("Successful login")
+        if luna_login(s):
+            print("Successful login")
+        else:
+            sys.exit(1) # Error reason should have already been printed by the login procedure
     except Exception as e:
         print("Error: %s"%e)
         sys.exit(1)

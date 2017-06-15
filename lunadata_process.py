@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''Extract Session Papers data from Luna and make some case files'''
 import sys, requests
 from moonsun_miner import luna_login, solr_query

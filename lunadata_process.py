@@ -17,7 +17,7 @@ fields = ['work_shelfmark', # Volume
           'work_subset_index',  # Case Number
           'sequence', # Page number of image (in Case, not Volume!)
           'repro_title', # 'Case X, Page Y' - Useful for asserting data is correct?
-          'mediaFileName' # Image filename
+          'mediafileName' # Image filename
           ]
 # Sort down hierarchically in Solr for efficiency
 sort = ['work_shelfmark asc', # Volume
@@ -60,3 +60,12 @@ def reduce_singles(source_list):
 from pprint import pprint
 new_results = reduce_singles(results)
 pprint(new_results[0:10])
+
+# Lets try writing a csv
+import csv
+with open('test.csv', 'w') as outfile:
+    writer = csv.DictWriter(outfile, fieldnames=fields)
+    writer.writeheader()
+    writer.writerows(new_results)
+
+

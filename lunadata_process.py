@@ -17,7 +17,8 @@ fields = ['work_shelfmark', # Volume
           'work_subset_index',  # Case Number
           'sequence', # Page number of image (in Case, not Volume!)
           'repro_title', # 'Case X, Page Y' - Useful for asserting data is correct?
-          'mediafileName' # Image filename
+          'mediafileName', # Image filename
+          'urlSize4' # We need something with image directory
           ]
 # Sort down hierarchically in Solr for efficiency
 sort = ['work_shelfmark asc', # Volume
@@ -26,7 +27,7 @@ sort = ['work_shelfmark asc', # Volume
         ]
 
 # Ok here we go!
-results = solr_query(s, query, fields=fields, sort=sort)
+results = solr_query(s, query, fields=fields, sort=sort, limit = 10)
 # So either we have results or moonsun_miner exited with error, so we can be  a bit lazy and not bother to check
 # the response before processing!!
 # (I know this is very bad program design, but I intend to properly module-ise moonsun_miner in the near future,
@@ -60,6 +61,23 @@ def reduce_singles(source_list):
 from pprint import pprint
 new_results = reduce_singles(results)
 pprint(new_results[0:10])
+
+# ok, let's trim that url path a bit since we only need the end!
+for item in new_results:
+    # The Python syntax here is a bit confusing because of the chaining
+    # It starts with the character which will be used to re-join the split string - "/".join
+    # This takes an argument of a list, which we are generating by splitting the data on / - item["urlSize4"].split("/")
+    # Once the above split is done, we only want the last two arguments to pass to the joiner - [-2:]
+    item["filepath"] = "/".join(item["urlSize4"].split("/")[-2:])
+
+    # get rid of the full path, because we now have no use for it
+    del item["urlSize4"]
+
+# Now that we've changed what data is held, lets amend the fields list so we can re-use it for CSV export etc
+fields.append("filepath")
+fields.remove("urlSize4")
+
+
 
 # Lets try writing a csv
 import csv

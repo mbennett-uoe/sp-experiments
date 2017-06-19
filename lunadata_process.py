@@ -99,7 +99,13 @@ for item in new_results:
 
 # lets see
 print("Found %s results with both images"%len(subset_results))
-pprint(subset_results)
+#pprint(subset_results)
+# dump to csv
+import csv
+with open('testable_luna_data.csv', 'w') as outfile:
+    writer = csv.DictWriter(outfile, fieldnames=fields)
+    writer.writeheader()
+    writer.writerows(subset_results)
 
 
 

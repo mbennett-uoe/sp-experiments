@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 '''Extract Session Papers data from Luna and make some case files'''
-import sys, requests
+import sys, requests, os
 from moonsun_miner import luna_login, solr_query
 
 # Let's get the data!
@@ -27,7 +27,7 @@ sort = ['work_shelfmark asc', # Volume
         ]
 
 # Ok here we go!
-results = solr_query(s, query, fields=fields, sort=sort, limit = 10)
+results = solr_query(s, query, fields=fields, sort=sort)
 # So either we have results or moonsun_miner exited with error, so we can be  a bit lazy and not bother to check
 # the response before processing!!
 # (I know this is very bad program design, but I intend to properly module-ise moonsun_miner in the near future,
@@ -60,7 +60,7 @@ def reduce_singles(source_list):
 # Process the results as above and show a couple to check it's working
 from pprint import pprint
 new_results = reduce_singles(results)
-pprint(new_results[0:10])
+#pprint(new_results[0:10])
 
 # ok, let's trim that url path a bit since we only need the end!
 for item in new_results:
@@ -77,13 +77,29 @@ for item in new_results:
 fields.append("filepath")
 fields.remove("urlSize4")
 
-
-
 # Lets try writing a csv
 import csv
 with open('test.csv', 'w') as outfile:
     writer = csv.DictWriter(outfile, fieldnames=fields)
     writer.writeheader()
     writer.writerows(new_results)
+
+
+# ok, lets see if we can actually find the media files!
+# for this test, we want a subset of pages for which both exist, so we can directly compare the OCR results
+jpg_prefix = "/home/mike/Projects/sp-experiments/images/UoE~1~1/"
+tiff_prefix = "/media/diu_projects/SessionPapers/0133000-0133999/Process/"
+
+subset_results = []
+
+for item in new_results:
+    jpg = jpg_prefix + item["filepath"]
+    tiff = tiff_prefix + item["mediafileName"]
+    if os.path.isfile(jpg) and os.path.isfile(tiff): subset_results.append(item)
+
+# lets see
+print("Found %s results with both images"%len(subset_results))
+pprint(subset_results)
+
 
 

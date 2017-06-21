@@ -125,10 +125,10 @@ def find_components(edges, max_components=16):
         dilated_image = dilate(edges, N=3, iterations=n)
         _, contours, hierarchy = cv2.findContours(dilated_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         count = len(contours)
-        #print "count: %s"%count
-        #if count <300:
-         #   Image.fromarray(255 * dilated_image).show()
-         #   x = raw_input("continue")
+        print "count: %s"%count
+        if count <300:
+            Image.fromarray(255 * dilated_image).show()
+            x = raw_input("continue")
         #print(dilation)
     #Image.fromarray(edges).show()
     #Image.fromarray(255 * dilated_image).show()
@@ -243,19 +243,34 @@ def downscale_image(im, max_dim=2048):
 
 def process_image(path, out_path):
     orig_im = Image.open(path)
-    scale, im = downscale_image(orig_im)
+    scale = 1.0
+    #scale, im = downscale_image(orig_im)
+    w, h = orig_im.size
+    new_im = orig_im.crop((50, 50, w - 50, h - 50))
 
+    # grayscale+binarization test
+    cvim = cv2.imread(path)
+    gray = cv2.cvtColor(cvim, cv2.COLOR_BGR2GRAY)  # grayscale
+    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+    #im = thresh
+#    new_im=thresh
+#    im=thresh
 
+    im = Image.fromarray(thresh)
     # crop 10px from each side
-    w,h = im.size
-    #print w,h
-    new_im = im.crop((50,50,w-50,h-50))
-    #new_im.show()
-    #x = raw_input("t")
-    im=new_im
+    w, h = im.size
+    # print w,h
+    im = im.crop((50, 50, w - 50, h - 50))
+    im.show()
+    x = raw_input("t")
 
+    #edges = cv2.Canny(thresh, 100, 200)
     edges = cv2.Canny(np.asarray(im), 100, 200)
-    #Image.fromarray(edges).show()
+    Image.fromarray(edges).show()
+
+
+
+
 
     # TODO: dilate image _before_ finding a border. This is crazy sensitive!
     #_, contours, hierarchy = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
@@ -313,7 +328,7 @@ if __name__ == '__main__':
     for path in files:
         out_path = path.replace('.jpg', '.crop.png')
         #if os.path.exists(out_path): continue
-        try:
-            process_image(path, out_path)
-        except Exception as e:
-            print '%s %s' % (path, e)
+        #try:
+        process_image(path, out_path)
+        #except Exception as e:
+        #    print '%s %s' % (path, e)

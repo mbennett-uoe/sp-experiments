@@ -125,10 +125,10 @@ def find_components(edges, max_components=16):
         dilated_image = dilate(edges, N=3, iterations=n)
         _, contours, hierarchy = cv2.findContours(dilated_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         count = len(contours)
-        print "count: %s"%count
-        if count <300:
-            Image.fromarray(255 * dilated_image).show()
-            x = raw_input("continue")
+        #print "count: %s"%count
+        #if count <300:
+         #   Image.fromarray(255 * dilated_image).show()
+         #   x = raw_input("continue")
         #print(dilation)
     #Image.fromarray(edges).show()
     #Image.fromarray(255 * dilated_image).show()

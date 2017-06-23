@@ -125,10 +125,10 @@ def find_components(edges, max_components=16):
         dilated_image = dilate(edges, N=3, iterations=n)
         _, contours, hierarchy = cv2.findContours(dilated_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         count = len(contours)
-        print "count: %s"%count
-        if count <300:
-            Image.fromarray(255 * dilated_image).show()
-            x = raw_input("continue")
+        #print "count: %s"%count
+        #if count <300:
+        #    Image.fromarray(255 * dilated_image).show()
+        #    x = raw_input("continue")
         #print(dilation)
     #Image.fromarray(edges).show()
     #Image.fromarray(255 * dilated_image).show()
@@ -246,12 +246,13 @@ def process_image(path, out_path):
     scale = 1.0
     #scale, im = downscale_image(orig_im)
     w, h = orig_im.size
-    new_im = orig_im.crop((50, 50, w - 50, h - 50))
-
+    new_im = orig_im.crop((50, 0, w - 50, h))
+    #new_im.show()
     # grayscale+binarization test
-    cvim = cv2.imread(path)
+    cvim = np.asarray(new_im)
     gray = cv2.cvtColor(cvim, cv2.COLOR_BGR2GRAY)  # grayscale
-    _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+    #Image.fromarray(gray).show()
+    _, thresh = cv2.threshold(gray, 120, 255, cv2.THRESH_BINARY_INV)
     #im = thresh
 #    new_im=thresh
 #    im=thresh
@@ -260,39 +261,39 @@ def process_image(path, out_path):
     # crop 10px from each side
     w, h = im.size
     # print w,h
-    im = im.crop((50, 50, w - 50, h - 50))
-    im.show()
-    x = raw_input("t")
+    #im = im.crop((50, 50, w - 50, h - 50))
+    #im.show()
+    #x = raw_input("t")
 
-    #edges = cv2.Canny(thresh, 100, 200)
-    edges = cv2.Canny(np.asarray(im), 100, 200)
-    Image.fromarray(edges).show()
-
-
-
-
+    edges = cv2.Canny(thresh, 100, 200)
+    #edges = cv2.Canny(np.asarray(im), 100, 200)
+    #Image.fromarray(edges).show()
+    #edges = np.asarray(im)
 
     # TODO: dilate image _before_ finding a border. This is crazy sensitive!
     #_, contours, hierarchy = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-    _, contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    borders = find_border_components(contours, edges)
+    #_, contours, hierarchy = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    #borders = find_border_components(contours, edges)
     #print borders
-    borders.sort(key=lambda (i, x1, y1, x2, y2): (x2 - x1) * (y2 - y1))
+    #borders.sort(key=lambda (i, x1, y1, x2, y2): (x2 - x1) * (y2 - y1))
     #print "---"
     #print contours[borders[0][0]]
     #Image.fromarray(borders).show()
-    border_contour = None
-    if len(borders):
-        border_contour = contours[borders[0][0]]
+    #border_contour = None
+    #if len(borders):
+    #    border_contour = contours[borders[0][0]]
     #    edges = remove_border(border_contour, edges)
 
     edges = 255 * (edges > 0).astype(np.uint8)
-    #Image.fromarray(edges).show()
+    #
     # Remove ~1px borders using a rank filter.
     maxed_rows = rank_filter(edges, -4, size=(1, 20))
     maxed_cols = rank_filter(edges, -4, size=(20, 1))
     debordered = np.minimum(np.minimum(edges, maxed_rows), maxed_cols)
     edges = debordered
+    #Image.fromarray(edges).show()
+
+
 
     contours = find_components(edges)
     if len(contours) == 0:
@@ -300,19 +301,21 @@ def process_image(path, out_path):
         return
 
     crop = find_optimal_components_subset(contours, edges)
-    crop = pad_crop(crop, contours, edges, border_contour)
+    crop = pad_crop(crop, contours, edges, None)
 
-    crop = [int(x / scale) for x in crop]  # upscale to the original image size.
-    #draw = ImageDraw.Draw(im)
+    #crop = [int(x / scale) for x in crop]  # upscale to the original image size.
+    #boxim = Image.open("/tmp/cropped.png")
+    #draw = ImageDraw.Draw(boxim)
     #c_info = props_for_contours(contours, edges)
     #for c in c_info:
-    #    this_crop = c['x1'], c['y1'], c['x2'], c['y2']
-    #    draw.rectangle(this_crop, outline='blue')
+     #   this_crop = c['x1'], c['y1'], c['x2'], c['y2']
+     #   draw.rectangle(this_crop, outline='white')
+    #boxim.show()
     #draw.rectangle(crop, outline='red')
     #im.save(out_path + ".A.png")
     #draw.text((50, 50), path, fill='red')
     #orig_im.save(out_path + ".B.png")
-    #im.show()
+    #boxim.show()
     text_im = new_im.crop(crop)
     text_im.save(out_path)
     print '%s -> %s' % (path, out_path)

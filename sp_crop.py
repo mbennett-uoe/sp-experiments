@@ -318,7 +318,7 @@ def process_image(path, out_path):
     #boxim.show()
     text_im = new_im.crop(crop)
     text_im.save(out_path)
-    print '%s -> %s' % (path, out_path)
+    #print '%s -> %s' % (path, out_path)
 
 
 if __name__ == '__main__':

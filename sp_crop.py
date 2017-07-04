@@ -156,7 +156,7 @@ def find_optimal_components_subset(contours, edges):
         recall = 1.0 * covered_sum / total
         prec = 1 - 1.0 * crop_area(crop) / area
         f1 = 2 * (prec * recall / (prec + recall))
-        print( '----')
+        #print( '----')
         for i, c in enumerate(c_info):
             this_crop = c['x1'], c['y1'], c['x2'], c['y2']
             new_crop = union_crops(crop, this_crop)
@@ -172,10 +172,10 @@ def find_optimal_components_subset(contours, edges):
             new_area_frac = 1.0 * crop_area(new_crop) / crop_area(crop) - 1
             if new_f1 > f1  or (
                     remaining_frac > 0.10 and new_area_frac < 0.35):
-                print '%d %s -> %s / %s (%s), %s -> %s / %s (%s), %s -> %s' % (
-                        i, covered_sum, new_sum, total, remaining_frac,
-                        crop_area(crop), crop_area(new_crop), area, new_area_frac,
-                        f1, new_f1)
+                #print '%d %s -> %s / %s (%s), %s -> %s / %s (%s), %s -> %s' % (
+                #        i, covered_sum, new_sum, total, remaining_frac,
+                #        crop_area(crop), crop_area(new_crop), area, new_area_frac,
+                #        f1, new_f1)
                 crop = new_crop
                 covered_sum = new_sum
                 del c_info[i]
@@ -217,7 +217,7 @@ def pad_crop(crop, contours, edges, border_contour, pad_px=15):
         int_area = crop_area(intersect_crops(crop, this_crop))
         new_crop = crop_in_border(union_crops(crop, this_crop))
         if 0 < int_area < this_area and crop != new_crop:
-            print '%s -> %s' % (str(crop), str(new_crop))
+            #print '%s -> %s' % (str(crop), str(new_crop))
             changed = True
             crop = new_crop
 
@@ -297,7 +297,7 @@ def process_image(path, out_path):
 
     contours = find_components(edges)
     if len(contours) == 0:
-        print ('%s -> (no text!)' % path)
+        #print ('%s -> (no text!)' % path)
         return
 
     crop = find_optimal_components_subset(contours, edges)

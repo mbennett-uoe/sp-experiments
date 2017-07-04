@@ -18,6 +18,8 @@ queues = {"read":"ocr:to_process",
           "error":"ocr:errors"
           }
 
+status = "status:ocr_worker"
+
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
 wait_maxseconds = 900 # What stage to stop increasing the wait time
@@ -29,8 +31,9 @@ tesseract_dicts = ["eng", "enm"]
 try:
     tess = pyocr.get_available_tools()[0]
 except Exception as e:
-    print("Fatal Error - No Tesseract found!")
-    print(e)
+    r.set(status,"%s: Terminated with fatal error - No Tesseract found! - %s"%(datetime.utcnow(),e))
+    #print("Fatal Error - No Tesseract found!")
+    #print(e)
     sys.exit(1)
 
 current_wait = wait_seconds
@@ -40,7 +43,7 @@ while not should_exit:
     json_item = r.rpoplpush(queues["read"],queues["work"])
     if json_item:
         # Ok, lets get to work :D
-        print("Item found: %s"%json_item)
+        #print("Item found: %s"%json_item)
 
         # Reset the wait timer
         current_wait = wait_seconds
@@ -87,7 +90,8 @@ while not should_exit:
             continue
         # ok, so at this point everything should be cool, let's try and process the image
         try:
-            print("Running OCR...")
+            r.set(status, "%s: Processing %s"%(datetime.utcnow(),item["infile"]))
+            #print("Running OCR...")
             # if no dictionaries specified, use all of them!
             if len(item["dicts"]) == 0:
                 dicts = tesseract_dicts
@@ -112,7 +116,8 @@ while not should_exit:
             # write to complete, remove from in progress
             r.rpush(queues["write"], json_item)
             r.lrem(queues["work"], json_item)
-            print("Done")
+            r.set(status, "%s: Waiting for work"%datetime.utcnow())
+            #print("Done")
             # all done, go to the top and start again!
             continue
         except Exception as e:
@@ -121,10 +126,14 @@ while not should_exit:
                      "timestamp": datetime.utcnow(),
                      "data": json_item}
             r.lpush(queues["error"], error)
+            r.set(status, "%s: Waiting for work"%datetime.utcnow())
     else:
-        if exit_when_empty: sys.exit(1)
+        if exit_when_empty:
+            r.set(status, "%s: Terminated due to empty queue"%datetime.utcnow())
+            sys.exit(1)
         # no item, wait and try again
-        print("No items in queue, sleeping for %ss"%current_wait)
+        #print("No items in queue, sleeping for %ss"%current_wait)
+        r.set(status, "%s: No items in queue, sleeping for %ss"%(datetime.utcnow(),current_wait))
         sleep(current_wait)
         current_wait = current_wait * wait_modifier
         if current_wait > wait_maxseconds: current_wait = wait_maxseconds

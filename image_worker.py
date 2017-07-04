@@ -16,9 +16,10 @@ queues = {"read":"images:to_process",
           "work":"images:in_progress",
           "error":"images:errors"
           }
+status = "status:image_worker"
 
-wait_seconds = 60 # How long to sleep for if no items in the queue
-wait_modifier = 1.5 # Multiplier for wait_seconds if consecutive polls are empty
+wait_seconds =15 # How long to sleep for if no items in the queue
+wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
 wait_maxseconds = 900 # What stage to stop increasing the wait time
 exit_when_empty = False
 
@@ -29,7 +30,7 @@ while not should_exit:
     json_item = r.rpoplpush(queues["read"],queues["work"])
     if json_item:
         # Ok, lets get to work :D
-        print("Item found: %s"%json_item)
+        #print("Item found: %s"%json_item)
 
         # Reset the wait timer
         current_wait = wait_seconds
@@ -68,13 +69,15 @@ while not should_exit:
             continue
         # ok, so at this point everything should be cool, let's try and process the image
         try:
-            print("Calling the image processor...")
+            #print("Calling the image processor...")
+            r.set(status,"%s: Processing %s"%(datetime.utcnow(),item["infile"]))
             process_image(item["infile"], item["outfile"])
             # if this didn't error out to the except block, we can assume process complete
             # write to complete, remove from in progress
             r.rpush(queues["write"], json_item)
             r.lrem(queues["work"], json_item)
-            print("Done")
+            r.set(status, "%s: Waiting for work"%datetime.utcnow())
+            #print("Done")
             # all done, go to the top and start again!
             continue
         except Exception as e:
@@ -83,10 +86,14 @@ while not should_exit:
                      "timestamp": datetime.utcnow(),
                      "data": json_item}
             r.lpush(queues["error"], error)
+            r.set(status, "%s: Waiting for work" % datetime.utcnow())
     else:
-        if exit_when_empty: sys.exit(1)
+        if exit_when_empty:
+            r.set(status, "%s: Terminated due to empty queue"%datetime.utcnow())
+            sys.exit(1)
         # no item, wait and try again
-        print("No items in queue, sleeping for %ss"%current_wait)
+        #print("No items in queue, sleeping for %ss"%current_wait)
+        r.set(status, "%s: No items in queue, sleeping for %ss" %(datetime.utcnow(), current_wait))
         sleep(current_wait)
         current_wait = current_wait * wait_modifier
         if current_wait > wait_maxseconds: current_wait = wait_maxseconds

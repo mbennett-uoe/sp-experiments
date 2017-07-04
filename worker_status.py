@@ -1,5 +1,5 @@
 import curses
-import time
+import time, datetime
 from redis import Redis
 
 r = Redis()
@@ -44,7 +44,7 @@ def draw_windows():
     windows = {
         "queues" : spawn_window(10, 40, 0, 0, "Queues"),
         "worker_messages" : spawn_window(10, 80, 10, 0, "Worker status"),
-        "key_help" : spawn_window(10, 40, 0, 40, "Actions"),
+        "key_help" : spawn_window(10, 40, 0, 40, "Program info"),
         "errors" : spawn_window(10, 80, 20, 0, "Most recent errors"),
     }
     return windows
@@ -72,7 +72,7 @@ def get_statuses():
     return statuses
 
 def get_last_errors(num = 5):
-    redis_errors = r.scan(match="*:error")[1]
+    redis_errors = r.scan(match="*:errors")[1]
     errors = []
     if len(redis_errors) == 0: return []
     eq = int(num / len(redis_errors))
@@ -114,12 +114,12 @@ if __name__ == "__main__":
             except:
                 pass
 
-            if int(sec) % 2 == 0:
+            if int(sec) % 5 == 0:
                 update_data(screen, windows)
                 refresh_screen(screen, windows)
 
             sec += 0.1
-            windows["key_help"].addstr(0,0,"Uptime: %ss"%sec)
+            windows["key_help"].addstr(0,0,"Uptime: %s"%datetime.timedelta(seconds=int(sec)))
             windows["key_help"].refresh()
             time.sleep(0.1)
 

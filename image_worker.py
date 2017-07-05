@@ -41,7 +41,7 @@ while not should_exit:
         except Exception as e:
             error = {"error": "Could not load item dictionary from redis: %s"%e,
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": item}
+                     "data": json_item}
             r.lpush(queues["error"], json.dumps(error))
             continue
         # Do we have the two bits of data we need?

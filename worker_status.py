@@ -1,7 +1,7 @@
 import curses
 import time, datetime
 from redis import Redis
-
+import json
 r = Redis()
 
 def init_screen():
@@ -27,6 +27,7 @@ def reset_terminal(screen):
     curses.endwin()
 
 def spawn_window(lines, cols, y, x, title):
+    # draw the window, add the title, and create a subwindow for holding contents
     title_style = curses.A_BOLD + curses.color_pair(curses.COLOR_GREEN)
     window = curses.newwin(lines, cols, y, x)
     window.border()
@@ -41,21 +42,47 @@ def spawn_window(lines, cols, y, x, title):
     return text_window
 
 def draw_windows():
+    # call the bordering wrapper for each window
     windows = {
-        "queues" : spawn_window(10, 40, 0, 0, "Queues"),
-        "worker_messages" : spawn_window(10, 80, 10, 0, "Worker status"),
-        "key_help" : spawn_window(10, 40, 0, 40, "Program info"),
-        "errors" : spawn_window(10, 80, 20, 0, "Most recent errors"),
+        # top line
+        "status": spawn_window(12, 40, 0, 0, "Program info"),
+        "queues" : spawn_window(12, 40, 0, 40, "Queues"),
+        "commands": spawn_window(12, 40, 0, 80, "Commands"),
+        # below that
+        "worker_messages" : spawn_window(8, 120, 12, 0, "Worker status"),
+        # below that
+        "errors" : spawn_window(30, 120, 20, 0, "Most recent errors"),
     }
-    return windows
 
+    # populate the commands window
+    commands = {
+        "r":"Force refresh of screen",
+        "t":"Change update speed (default 5s)",
+        "w":"Worker control",
+        "e":"Error handling",
+        "q":"Quit",
+    }
+    for iter, (command, text) in enumerate(commands.items()):
+        windows["commands"].addstr(iter, 0, "%s"%command, curses.A_BOLD+curses.color_pair(curses.COLOR_CYAN))
+        windows["commands"].addstr(": %s"%text)
+    return windows
 
 def refresh_screen(screen, windows):
     for window in windows: windows[window].noutrefresh()
     curses.doupdate()
 
 def get_queues():
-    redis_queues = r.scan_iter(match="[^status]*:*") # Every key containing ":" should be a queue except worker statuses
+    # removed this approach in favour of knowing the list of queues to monitor as redis removes empty queues,
+    # and we still want to know about them
+    #redis_queues = r.scan_iter(match="[^status]*:*") # Every key containing ":" should be a queue except worker statuses
+    redis_queues = [
+        "images:to_process",
+        "images:processed",
+        "images:errors",
+        "ocr:to_process",
+        "ocr:processed",
+        "ocr:errors",
+    ]
     queues = []
     for queue in redis_queues:
         length = r.llen(queue)
@@ -78,24 +105,32 @@ def get_last_errors(num = 5):
     eq = int(num / len(redis_errors))
     if eq == 0: eq = 1
     for error_queue in redis_errors:
-        errors.append(r.lrange(error_queue,0,eq-1))
+        for error in r.lrange(error_queue,0,eq-1): errors.append((error_queue,json.loads(error)))
     return errors
 
 def style_number(n):
     empty = curses.color_pair(curses.COLOR_GREEN)
     half = curses.color_pair(curses.COLOR_YELLOW)
     full = curses.color_pair(curses.COLOR_RED) + curses.A_BOLD
-    if n == 0: return empty
-    elif n > 100: return full
-    else: return half
+    if n == 0:
+        return empty
+    elif n > 100:
+        return full
+    else:
+        return half
 
 def update_data(screen, windows):
-    for window in windows: windows[window].erase()
+    # clear all non-static data. we could just overwrite it but then would have to handle for cases where the new
+    # data is less than the old data, and would therefore leave old characters on the screen, so just erasing them
+    # is quicker/easier. we attempt to save some resource by ignoring any windows that are never going to change
+    static_windows = ["commands"]
+    for window in [x for x in windows if x not in static_windows]: windows[window].erase()
+
     for queue, length in get_queues():
-        windows["queues"].addstr("%s: "%queue)
+        windows["queues"].addstr("%s:"%queue)
         windows["queues"].addstr("%s\n"%length, style_number(length))
     for name, status in get_statuses(): windows["worker_messages"].addstr("%s: %s\n"%(name,status))
-    for error in get_last_errors(): windows["errors"].addstr("%s\n"%error)
+    for queue, error in get_last_errors(): windows["errors"].addstr("Time: %s - Source: %s\nError: %s\nData: %s\n\n"%(error["timestamp"], queue, error["error"], error["data"]))
 
 
 
@@ -103,14 +138,15 @@ if __name__ == "__main__":
     try:
         screen = init_screen()
         windows = draw_windows()
-
         sec = 0
         while True:
             try:
                 keypress = windows["errors"].getch()
                 if keypress == ord('q'): break
                 if keypress == ord('f'): screen.flash()
-                if keypress == ord('b'): windows["errors"].addstr("ZOMG", curses.color_pair(curses.COLOR_CYAN))
+                if keypress == ord('b'):
+                    windows["commands"].addstr("ZOMG", curses.color_pair(curses.COLOR_CYAN))
+                    windows["commands"].refresh()
             except:
                 pass
 
@@ -119,15 +155,10 @@ if __name__ == "__main__":
                 refresh_screen(screen, windows)
 
             sec += 0.1
-            windows["key_help"].addstr(0,0,"Uptime: %s"%datetime.timedelta(seconds=int(sec)))
-            windows["key_help"].refresh()
+            windows["status"].addstr(0,0,"Uptime: %s"%datetime.timedelta(seconds=int(sec)))
+            windows["status"].refresh()
             time.sleep(0.1)
 
-
-
-    #except Exception as e:
-    #    reset_terminal(screen)
-    #    print e
     finally:
         reset_terminal(screen)
 

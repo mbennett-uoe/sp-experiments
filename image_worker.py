@@ -41,8 +41,8 @@ while not should_exit:
         except Exception as e:
             error = {"error": "Could not load item dictionary from redis: %s"%e,
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": json_item}
-            r.lpush(queues["error"], error)
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
             continue
         # Do we have the two bits of data we need?
         if not item["infile"] or not item["outfile"]:
@@ -50,22 +50,22 @@ while not should_exit:
             # never end up here unless I've done something monumentally stupid, but better safe than sorry!
             error = {"error":"Missing in or out file name(s)",
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": json_item}
-            r.lpush(queues["error"],error)
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
             continue
         # Does the desired input file exist?
         if not os.path.isfile(item["infile"]):
             error = {"error": "Input file does not exist",
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": json_item}
-            r.lpush(queues["error"], error)
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
             continue
         # Does the proposed output file exist? If so, and the overwrite flag is not set, it's a problem!
         if os.path.isfile(item["outfile"]) and "overwrite" not in item:
             error = {"error": "Output file exists and overwrite flag not set",
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": json_item}
-            r.lpush(queues["error"], error)
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
             continue
         # ok, so at this point everything should be cool, let's try and process the image
         try:
@@ -84,8 +84,8 @@ while not should_exit:
             # something went wrong with image processing
             error = {"error": str(e),
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": json_item}
-            r.lpush(queues["error"], error)
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
             r.set(status, "%s: Waiting for work" % datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"))
     else:
         if exit_when_empty:

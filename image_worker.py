@@ -43,6 +43,7 @@ while not should_exit:
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
                      "data": json_item}
             r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
             continue
         # Do we have the two bits of data we need?
         if not item["infile"] or not item["outfile"]:
@@ -52,6 +53,7 @@ while not should_exit:
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
             continue
         # Does the desired input file exist?
         if not os.path.isfile(item["infile"]):
@@ -59,6 +61,7 @@ while not should_exit:
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
             continue
         # Does the proposed output file exist? If so, and the overwrite flag is not set, it's a problem!
         if os.path.isfile(item["outfile"]) and "overwrite" not in item:
@@ -66,6 +69,7 @@ while not should_exit:
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
             continue
         # ok, so at this point everything should be cool, let's try and process the image
         try:
@@ -86,6 +90,7 @@ while not should_exit:
                      "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work" % datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"))
     else:
         if exit_when_empty:

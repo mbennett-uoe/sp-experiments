@@ -62,9 +62,9 @@ def draw_windows():
         "e":"Error handling",
         "q":"Quit",
     }
-    for iter, (command, text) in enumerate(commands.items()):
-        windows["commands"].addstr(iter, 0, "%s"%command, curses.A_BOLD+curses.color_pair(curses.COLOR_CYAN))
-        windows["commands"].addstr(": %s"%text)
+    for command, text in commands.iteritems():
+        windows["commands"].addstr("%s"%command, curses.A_BOLD+curses.color_pair(curses.COLOR_CYAN))
+        windows["commands"].addstr(": %s\n"%text)
     return windows
 
 def refresh_screen(screen, windows):

@@ -1,5 +1,6 @@
-import curses
-import time, datetime
+import curses, curses.panel
+import time
+from datetime import datetime
 from redis import Redis
 import json
 r = Redis()
@@ -26,9 +27,12 @@ def reset_terminal(screen):
     curses.echo()
     curses.endwin()
 
-def spawn_window(lines, cols, y, x, title):
+def spawn_window(lines, cols, y, x, title, colour = curses.COLOR_GREEN):
+    # !!! internal function only, do not call this direct from any logic !!!
+    # Use the wrapper function add_window, which also deals with the paneling system
+
     # draw the window, add the title, and create a subwindow for holding contents
-    title_style = curses.A_BOLD + curses.color_pair(curses.COLOR_GREEN)
+    title_style = curses.A_BOLD + curses.color_pair(colour)
     window = curses.newwin(lines, cols, y, x)
     window.border()
     window.addstr(0, 2, title, title_style)
@@ -39,9 +43,11 @@ def spawn_window(lines, cols, y, x, title):
     text_window = window.derwin(lines-4, cols-4, 2, 2)
     text_window.nodelay(1)
     #window.overlay(text_window)
-    return text_window
+    return window, text_window
 
-def draw_windows():
+def draw_initial_windows():
+    # initialise all the default windows at the start
+    # this could be reimplemented in the future to read from a config file instead
     # call the bordering wrapper for each window
     windows = {
         # top line
@@ -54,22 +60,65 @@ def draw_windows():
         "errors" : spawn_window(30, 120, 20, 0, "Most recent errors"),
     }
 
+    # spawn a panel object with the same id for each window, so we can stack them nicely rather than farting about
+    # doing overlays for input by hand etc
+    panels = {}
+    for key, (parent, child) in windows.iteritems():
+        panels[key] = {"parent":curses.panel.new_panel(parent), "child":curses.panel.new_panel(child)}
+        windows[key] = child
+
     # populate the commands window
     commands = {
-        "r":"Force refresh of screen",
+        "r":"Force refresh of data",
         "t":"Change update speed (default 5s)",
         "w":"Worker control",
         "e":"Error handling",
+        "m":"Queue management",
         "q":"Quit",
     }
     for command, text in commands.iteritems():
         windows["commands"].addstr("%s"%command, curses.A_BOLD+curses.color_pair(curses.COLOR_CYAN))
         windows["commands"].addstr(": %s\n"%text)
-    return windows
 
-def refresh_screen(screen, windows):
-    for window in windows: windows[window].noutrefresh()
+    return windows, panels
+
+def add_window(id, lines, cols, y, x, title, colour = curses.COLOR_GREEN, visible = True):
+    # spawn the window object
+    parent, child = spawn_window(lines, cols, y, x, title, colour)
+    panels[id] = {"parent": curses.panel.new_panel(parent), "child": curses.panel.new_panel(child)}
+    windows[id] = child
+    panels[id]["parent"].top()
+    panels[id]["child"].top()
+    toggle_window(id, visible)
+    return child
+
+
+def del_window(id):
+    del panels[id]
+    del windows[id]
+    refresh_screen()
+
+
+def toggle_window(window, visible):
+    if visible:
+        panels[window]["parent"].show()
+        panels[window]["child"].show()
+    else:
+        panels[window]["parent"].hide()
+        panels[window]["child"].hide()
+
+def refresh_screen():
+    curses.panel.update_panels()
     curses.doupdate()
+
+def show_alert(alert):
+    window = add_window("alert", 5, 50, 7, 35, "ERROR", curses.COLOR_RED)
+    window.addstr(alert, curses.A_BOLD)
+    # block till cleared
+    window.timeout(-1)
+    window.getch()
+    del_window("alert")
+
 
 def get_queues():
     # removed this approach in favour of knowing the list of queues to monitor as redis removes empty queues,
@@ -119,12 +168,11 @@ def style_number(n):
     else:
         return half
 
-def update_data(screen, windows):
+def update_data():
     # clear all non-static data. we could just overwrite it but then would have to handle for cases where the new
     # data is less than the old data, and would therefore leave old characters on the screen, so just erasing them
     # is quicker/easier. we attempt to save some resource by ignoring any windows that are never going to change
-    static_windows = ["commands"]
-    for window in [x for x in windows if x not in static_windows]: windows[window].erase()
+    for window in ["queues", "worker_messages", "errors"]: windows[window].erase()
 
     for queue, length in get_queues():
         windows["queues"].addstr("%s:"%queue)
@@ -133,30 +181,151 @@ def update_data(screen, windows):
     for queue, error in get_last_errors(): windows["errors"].addstr("Time: %s - Source: %s\nError: %s\nData: %s\n\n"%(error["timestamp"], queue, error["error"], error["data"]))
 
 
+def handle_keypress(char):
+    pass
+def manage_queues():
+    # spawn and fill the window
+    window = add_window("qmanage",18,80,5,20,"Queue management")
+
+    window.addstr("Select function:\n\n", curses.A_BOLD)
+    window.addstr("1) ", curses.A_BOLD)
+    window.addstr("Empty queue\n")
+    window.addstr("2) ", curses.A_BOLD)
+    window.addstr("Move items\n")
+    window.addstr("3) ", curses.A_BOLD)
+    window.addstr("Dump queue to file")
+
+    queues = [queue for queue, length in get_queues()]
+    source_letters = "abcdefghijklm"
+    dest_letters = "nlopqrstuvwxyz"
+
+    window.addstr(0,25,"Select source queue:", curses.A_BOLD)
+    for count, (letter, queue) in enumerate(zip(source_letters, queues)):
+        window.addstr(2+count,25,"%s)"%letter, curses.A_BOLD )
+        window.addstr(2+count,28,queue)
+
+    window.addstr(0, 50, "Select destination queue:", curses.A_BOLD)
+    for count, (letter, queue) in enumerate(zip(dest_letters, queues)):
+        window.addstr(2 + count, 50, "%s)" % letter, curses.A_BOLD)
+        window.addstr(2 + count, 53, queue)
+
+    window.addstr(10,8,"Press Enter to execute or Backspace to return to main screen")
+
+    # enter loop until user hits enter or backspace
+    selected = {
+        "function":0,
+        "inqueue":None,
+        "outqueue":None
+    }
+    while True:
+        x = window.getch()
+        if x == -1: continue
+        elif x == 10: # enter
+            continue # TODO monday: write this logic :)
+        elif x == 127: # backspace
+            del_window("qmanage")
+            break
+        else: x = chr(x)
+
+        if x.isdigit():
+            input_num = int(x)
+            if 0 < input_num > 3: continue # not a valid function number
+            selected["function"] = input_num
+            for line in xrange(2,5):
+                if line == selected["function"]+1: window.chgat(line, 3, 18, curses.A_STANDOUT)
+                else: window.chgat(line, 3, 18, curses.A_NORMAL)
+        elif x in source_letters[:len(queues)]:
+            selected["inqueue"] = x
+            for line in xrange(2,len(queues)+2):
+                if window.instr(line, 25, 1) == x: window.chgat(line, 28, 18, curses.A_STANDOUT)
+                else: window.chgat(line, 28, 18, curses.A_NORMAL)
+        elif x in dest_letters[:len(queues)]:
+            selected["outqueue"] = x
+            for line in xrange(2, len(queues) + 2):
+                if window.instr(line, 50, 1) == x:
+                    window.chgat(line, 53, 18, curses.A_STANDOUT)
+                else:
+                    window.chgat(line, 53, 18, curses.A_NORMAL)
+
+def user_input(query, default = "", responsetype = str):
+    # initialise the input overlay
+    winheight = int(len(query)/56)+5 # Make sure window is big enough to fit the query!
+    window = add_window("input",winheight,60,10,30,"User input")
+    window.addstr(query)
+    window.timeout(-1) # wait for enter when using getstr
+
+    # input loop
+    valid_input = False
+    while not valid_input:
+        # show a cursor and echo input
+        curses.curs_set(1)
+        curses.echo()
+        # clear any previous input
+        window.move(0,len(query)+1)
+        window.clrtoeol()
+        # get input from user
+        response = window.getstr(0,len(query)+1)
+        # turn echo + cursor back off
+        curses.noecho()
+        curses.curs_set(0)
+
+        # if response is blank, return the provided default
+        if response == "":
+            response = default
+            valid_input = True
+        else:
+            if responsetype == str:
+                valid_input = True
+            elif responsetype == int:
+                try:
+                    response = int(round(float(response)))
+                    valid_input= True
+                except ValueError:
+                    show_alert("Not a valid input, expecting a number")
+            else:
+                # don't know now what other types we might try and handle, probably other number types, but there's
+                # no harm in coding well now to make later expansion easier.
+                valid_input = True
+
+    # clear window and return val
+    del_window("input")
+    return response
+
+
 
 if __name__ == "__main__":
     try:
         screen = init_screen()
-        windows = draw_windows()
+        windows, panels = draw_initial_windows()
+
+        start_time = datetime.now().replace(microsecond = 0)
+        interval = 5
         sec = 0
         while True:
             try:
                 keypress = windows["errors"].getch()
-                if keypress == ord('q'): break
-                if keypress == ord('f'): screen.flash()
-                if keypress == ord('b'):
-                    windows["commands"].addstr("ZOMG", curses.color_pair(curses.COLOR_CYAN))
-                    windows["commands"].refresh()
             except:
-                pass
+                keypress = -1
 
-            if int(sec) % 5 == 0:
-                update_data(screen, windows)
-                refresh_screen(screen, windows)
+            if keypress > -1:
+                char = chr(keypress)
+                if char == "q":
+                    break
+                elif char == "r":
+                    update_data()
+                elif char == "t":
+                    interval = user_input("New update interval? (seconds):", 5, int)
+                elif char in ["w", "e"]: show_alert("Not implemented yet, sorry!")
+                elif char == "m": manage_queues()
+                else: handle_keypress(char)
 
             sec += 0.1
-            windows["status"].addstr(0,0,"Uptime: %s"%datetime.timedelta(seconds=int(sec)))
-            windows["status"].refresh()
+            if int(sec) % interval == 0: update_data()
+
+            windows["status"].addstr(0,0,"Uptime: %s"%(datetime.now().replace(microsecond = 0) - start_time))
+            windows["status"].addstr(1,0,"Update interval: %ss"%interval)
+            windows["status"].clrtoeol()
+            refresh_screen()
             time.sleep(0.1)
 
     finally:

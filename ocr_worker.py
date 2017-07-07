@@ -31,7 +31,7 @@ tesseract_dicts = ["eng", "enm"]
 try:
     tess = pyocr.get_available_tools()[0]
 except Exception as e:
-    r.set(status,"%s: Terminated with fatal error - No Tesseract found! - %s"%(datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),e))
+    r.set(status,"%s: Terminated with fatal error - No Tesseract found! - %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),e))
     #print("Fatal Error - No Tesseract found!")
     #print(e)
     sys.exit(1)
@@ -53,7 +53,7 @@ while not should_exit:
             item = json.loads(json_item)
         except Exception as e:
             error = {"error": "Could not load item dictionary from redis: %s"%e,
-                     "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": json_item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
@@ -63,7 +63,7 @@ while not should_exit:
             # Well, this is awkward! If I'm the only one populating the queue, I would hope that we should
             # never end up here unless I've done something monumentally stupid, but better safe than sorry!
             error = {"error":"Missing required data",
-                     "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
@@ -71,7 +71,7 @@ while not should_exit:
         # Does the desired input file exist?
         if not os.path.isfile(item["infile"]):
             error = {"error": "Input file does not exist",
-                     "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
@@ -79,7 +79,7 @@ while not should_exit:
         # Does the proposed output directory exist?
         if not os.path.isdir(item["outpath"]):
             error = {"error": "Output path is not a directory",
-                     "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
@@ -88,14 +88,14 @@ while not should_exit:
         # Is the proposed list of tesseract dictionaries actually a list?
         if not isinstance(item["dicts"], list):
             error = {"error": "Tesseract dictionaries list is not actually a list!",
-                     "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             continue
         # ok, so at this point everything should be cool, let's try and process the image
         try:
-            r.set(status, "%s: Processing %s"%(datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),item["infile"]))
+            r.set(status, "%s: Processing %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),item["infile"]))
             #print("Running OCR...")
             # if no dictionaries specified, use all of them!
             if len(item["dicts"]) == 0:
@@ -121,25 +121,25 @@ while not should_exit:
             # write to complete, remove from in progress
             r.rpush(queues["write"], json_item)
             r.lrem(queues["work"], json_item)
-            r.set(status, "%s: Waiting for work"%datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"))
+            r.set(status, "%s: Waiting for work"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
             #print("Done")
             # all done, go to the top and start again!
             continue
         except Exception as e:
             # something went wrong with image processing
             error = {"error": str(e),
-                     "timestamp": datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
-            r.set(status, "%s: Waiting for work"%datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"))
+            r.set(status, "%s: Waiting for work"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
     else:
         if exit_when_empty:
-            r.set(status, "%s: Terminated due to empty queue"%datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"))
+            r.set(status, "%s: Terminated due to empty queue"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
             sys.exit(1)
         # no item, wait and try again
         #print("No items in queue, sleeping for %ss"%current_wait)
-        r.set(status, "%s: No items in queue, sleeping for %ss"%(datetime.utcnow().strftime("%d/%m/%y %H:%M:%S"),current_wait))
+        r.set(status, "%s: No items in queue, sleeping for %ss"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),current_wait))
         sleep(current_wait)
         current_wait = current_wait * wait_modifier
         if current_wait > wait_maxseconds: current_wait = wait_maxseconds

@@ -199,6 +199,10 @@ def manage_queues():
     source_letters = "abcdefghijklm"
     dest_letters = "nlopqrstuvwxyz"
 
+    # generate lookup object
+    pairs = dict(zip(source_letters, queues) + zip(dest_letters, queues))
+
+
     window.addstr(0,25,"Select source queue:", curses.A_BOLD)
     for count, (letter, queue) in enumerate(zip(source_letters, queues)):
         window.addstr(2+count,25,"%s)"%letter, curses.A_BOLD )
@@ -221,7 +225,47 @@ def manage_queues():
         x = window.getch()
         if x == -1: continue
         elif x == 10: # enter
-            continue # TODO monday: write this logic :)
+            # clear previous status
+            window.move(12, 0)
+            window.clrtoeol()
+            # did the user select a function?
+            if selected["function"] == 0:
+                show_alert("Please select a function!")
+            # yes, amazing!
+            if selected["function"] == 1:
+                if selected["inqueue"]:
+                    if user_input("Empty queue %s Y/N?"%pairs[selected["inqueue"]],False, bool):
+                        if empty_queue(pairs[selected["inqueue"]]):
+                            window.addstr(12,4,"Queue %s emptied successfully"%pairs[selected["inqueue"]], curses.color_pair(curses.COLOR_GREEN))
+                        else:
+                            window.addstr(12,4,"Error emptying queue", curses.color_pair(curses.COLOR_RED))
+                else:
+                    show_alert("Please select an input queue")
+
+            if selected["function"] == 2:
+                if selected["inqueue"] and selected["outqueue"]:
+                    num = user_input("Move how many items (0 for all, blank to cancel)?",-1,int)
+                    if num == -1: continue # cancel
+                    elif num >= 0:
+                        if move_items(pairs[selected["inqueue"]], pairs[selected["outqueue"]], num):
+                            window.addstr(12, 4, "Items moved successfully", curses.color_pair(curses.COLOR_GREEN))
+                        else:
+                            window.addstr(12, 4, "Error moving items", curses.color_pair(curses.COLOR_RED))
+                    else: show_alert("Please enter a positive number")
+                else:
+                    show_alert("Please select input and output queues")
+
+            if selected["function"] == 3:
+                if selected["inqueue"]:
+                    if dump_queue(pairs[selected["inqueue"]]):
+                        window.addstr(12, 4, "Written to disk: /tmp/%s.queue"%pairs[selected["inqueue"]], curses.color_pair(curses.COLOR_GREEN))
+                    else:
+                        window.addstr(12, 4, "Error writing queue to disk", curses.color_pair(curses.COLOR_RED))
+                else:
+                    show_alert("Please select an input queue")
+
+            continue
+
         elif x == 127: # backspace
             del_window("qmanage")
             break
@@ -282,14 +326,47 @@ def user_input(query, default = "", responsetype = str):
                     valid_input= True
                 except ValueError:
                     show_alert("Not a valid input, expecting a number")
+            elif responsetype == bool:
+                if response in ["Y","y"]:
+                    response = True
+                    valid_input = True
+                elif response in ["N", "n"]:
+                    response = False
+                    valid_input = True
+                else:
+                    show_alert("Please enter Y/N")
             else:
                 # don't know now what other types we might try and handle, probably other number types, but there's
-                # no harm in coding well now to make later expansion easier.
+                # no harm in coding well now to make later expansion easier. edit 12/07 - apparently bool! :P
                 valid_input = True
 
     # clear window and return val
     del_window("input")
     return response
+
+def empty_queue(id):
+    try:
+        r.delete(id)
+        return True
+    except:
+        return False
+
+def move_items(src, dest, num):
+    try:
+        if num == 0: num = r.llen(src)
+        for x in xrange(0, num): r.rpoplpush(src, dest)
+        return True
+    except:
+        return False
+
+def dump_queue(src):
+    try:
+        items = r.lrange(src,0,-1)
+        with open("/tmp/%s.queue"%src, 'w') as outfile:
+            outfile.writelines(["%s\n"%json.dumps(item) for item in items])
+        return True
+    except:
+        return False
 
 
 

@@ -1,3 +1,4 @@
+import os
 import curses, curses.panel
 import time
 from datetime import datetime
@@ -147,6 +148,15 @@ def get_statuses():
         statuses.append((name,message))
     return statuses
 
+def get_workers():
+    redis_workers = r.scan_iter(match="pid:*")
+    pids = []
+    for worker in redis_workers:
+        name = worker.split(":")[1]
+        pid = int(r.get(worker))
+        pids.append((name, pid))
+    return pids
+
 def get_last_errors(num = 5):
     redis_errors = r.scan(match="*:errors")[1]
     errors = []
@@ -183,6 +193,63 @@ def update_data():
 
 def handle_keypress(char):
     pass
+
+def manage_workers():
+    # spawn and fill the window
+    window = add_window("wmanage",18,80,5,20,"Worker management")
+
+    workers = get_workers()
+    dead_workers = []
+    for worker, pid in workers:
+        try:
+            os.getpgid(pid)
+        except OSError:
+            dead_workers.append(worker)
+
+    window.addstr("Workers:\n\n", curses.A_BOLD)
+    for count, (worker, pid) in enumerate(workers):
+        if worker not in dead_workers:
+            window.addstr(2+count,0,"%s) "%(count+1))
+            window.addstr(2+count,3,"%s (PID: %s)"%(worker,pid),curses.color_pair(curses.COLOR_GREEN))
+        else:
+            window.addstr(2 + count, 0, "%s) " % (count+1))
+            window.addstr(2 + count, 3,"%s (PID: %s) - PID does not match any active process" % (worker, pid), curses.color_pair(curses.COLOR_RED))
+
+    window.addstr(10,12,"Select a worker and press K to kill or S to start")
+    window.addstr(12,17,"Press Backspace to return to main screen")
+
+    selected = 0
+    while True:
+        x = window.getch()
+        if x == -1: continue
+        elif x == 127: # backspace
+            del_window("wmanage")
+            return False # No action taken
+        else: x = chr(x)
+
+        if x.isdigit():
+            input_num = int(x)
+            if 0 < input_num > len(workers): continue # not a valid function number
+            selected = input_num
+            for line in xrange(2,2+len(workers)):
+                if line == selected+1: window.chgat(line, 0, 2, curses.A_STANDOUT)
+                else: window.chgat(line, 0, 2, curses.A_NORMAL)
+
+        if x in ["k","K"]:
+            if selected > 0:
+                # are we sure?
+                if user_input("Kill %s Y/N?" % workers[selected-1][0], False, bool):
+                    # faster (than) ps+cat, kill kill kill!
+                    os.kill(workers[selected-1][1],1) # send hup
+                    #show_alert("pid selected:%s"%)
+            else:
+                show_alert("Please select a worker!")
+            #pass
+        if x in ["r", "R"]:
+            pass
+
+
+
 def manage_queues():
     # spawn and fill the window
     window = add_window("qmanage",18,80,5,20,"Queue management")
@@ -392,7 +459,8 @@ if __name__ == "__main__":
                     update_data()
                 elif char == "t":
                     interval = user_input("New update interval? (seconds):", 5, int)
-                elif char in ["w", "e"]: show_alert("Not implemented yet, sorry!")
+                elif char in ["l", "e"]: show_alert("Not implemented yet, sorry!")
+                elif char == "w": manage_workers()
                 elif char == "m": manage_queues()
                 else: handle_keypress(char)
 

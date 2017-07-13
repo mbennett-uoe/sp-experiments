@@ -19,6 +19,7 @@ queues = {"read":"ocr:to_process",
           }
 
 status = "status:ocr_worker"
+pid = "pid:ocr_worker"
 
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
@@ -26,6 +27,10 @@ wait_maxseconds = 900 # What stage to stop increasing the wait time
 exit_when_empty = False
 
 tesseract_dicts = ["eng", "enm"]
+
+
+# write PID to redis
+r.set(pid,os.getpid())
 
 # initialise tesseract
 try:

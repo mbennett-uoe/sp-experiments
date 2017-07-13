@@ -17,11 +17,15 @@ queues = {"read":"images:to_process",
           "error":"images:errors"
           }
 status = "status:image_worker"
+pid = "pid:image_worker"
 
 wait_seconds =15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
 wait_maxseconds = 900 # What stage to stop increasing the wait time
 exit_when_empty = False
+
+# write pid to redis
+r.set(pid,os.getpid())
 
 current_wait = wait_seconds
 should_exit = False

@@ -1,4 +1,4 @@
-import os
+import os, subprocess
 import curses, curses.panel
 import time
 from datetime import datetime
@@ -216,6 +216,7 @@ def manage_workers():
             window.addstr(2 + count, 3,"%s (PID: %s) - PID does not match any active process" % (worker, pid), curses.color_pair(curses.COLOR_RED))
 
     window.addstr(10,12,"Select a worker and press K to kill or S to start")
+    window.addstr(11,18,"Press R to refresh worker process data")
     window.addstr(12,17,"Press Backspace to return to main screen")
 
     selected = 0
@@ -240,13 +241,28 @@ def manage_workers():
                 # are we sure?
                 if user_input("Kill %s Y/N?" % workers[selected-1][0], False, bool):
                     # faster (than) ps+cat, kill kill kill!
-                    os.kill(workers[selected-1][1],1) # send hup
-                    #show_alert("pid selected:%s"%)
+                    try:
+                        os.kill(workers[selected-1][1],9) # send hup - nope, not good enough, time for sigkill
+                        time.sleep(1)
+                        return True # action taken
+                    except:
+                        show_alert("Kill attempt failed")
             else:
                 show_alert("Please select a worker!")
-            #pass
+        if x in ["s", "S"]:
+            if selected > 0:
+                try:
+                    cmd = ["python", "%s.py"%workers[selected-1][0]]
+                    subprocess.Popen(cmd, close_fds=True)
+                    time.sleep(1)
+                    return True
+                except:
+                    show_alert("Start attempt failed - python %s.py"%workers[selected-1][0])
+            else:
+                show_alert("Please select a worker!")
         if x in ["r", "R"]:
-            pass
+            return True
+
 
 
 
@@ -460,7 +476,10 @@ if __name__ == "__main__":
                 elif char == "t":
                     interval = user_input("New update interval? (seconds):", 5, int)
                 elif char in ["l", "e"]: show_alert("Not implemented yet, sorry!")
-                elif char == "w": manage_workers()
+                elif char == "w":
+                    while manage_workers():
+                        del_window("wmanage")
+                        #manage_workers()
                 elif char == "m": manage_queues()
                 else: handle_keypress(char)
 

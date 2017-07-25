@@ -276,7 +276,9 @@ def manage_queues():
     window.addstr("2) ", curses.A_BOLD)
     window.addstr("Move items\n")
     window.addstr("3) ", curses.A_BOLD)
-    window.addstr("Dump queue to file")
+    window.addstr("Dump queue to file\n")
+    window.addstr("4) ", curses.A_BOLD)
+    window.addstr("Load queue from file")
 
     queues = [queue for queue, length in get_queues()]
     source_letters = "abcdefghijklm"
@@ -319,7 +321,8 @@ def manage_queues():
                 if selected["inqueue"]:
                     if user_input("Empty queue %s Y/N?"%pairs[selected["inqueue"]],False, bool):
                         if empty_queue(pairs[selected["inqueue"]]):
-                            window.addstr(12,4,"Queue %s emptied successfully"%pairs[selected["inqueue"]], curses.color_pair(curses.COLOR_GREEN))
+                            window.addstr(12,4,"Queue %s emptied successfully"%pairs[selected["inqueue"]],
+                                          curses.color_pair(curses.COLOR_GREEN))
                         else:
                             window.addstr(12,4,"Error emptying queue", curses.color_pair(curses.COLOR_RED))
                 else:
@@ -341,11 +344,23 @@ def manage_queues():
             if selected["function"] == 3:
                 if selected["inqueue"]:
                     if dump_queue(pairs[selected["inqueue"]]):
-                        window.addstr(12, 4, "Written to disk: /tmp/%s.queue"%pairs[selected["inqueue"]], curses.color_pair(curses.COLOR_GREEN))
+                        window.addstr(12, 4, "Written to disk: /tmp/%s.queue"%pairs[selected["inqueue"]],
+                                      curses.color_pair(curses.COLOR_GREEN))
                     else:
                         window.addstr(12, 4, "Error writing queue to disk", curses.color_pair(curses.COLOR_RED))
                 else:
                     show_alert("Please select an input queue")
+
+            if selected["function"] == 4:
+                if selected["outqueue"]:
+                    result = load_queue(pairs[selected["outqueue"]])
+                    if result:
+                        window.addstr(12, 4, "%s records loaded into %s" % (result, pairs[selected["outqueue"]]),
+                                      curses.color_pair(curses.COLOR_GREEN))
+                    else:
+                        window.addstr(12, 4, "Error loading queue from disk", curses.color_pair(curses.COLOR_RED))
+                else:
+                    show_alert("Please select a destination queue")
 
             continue
 
@@ -356,11 +371,11 @@ def manage_queues():
 
         if x.isdigit():
             input_num = int(x)
-            if 0 < input_num > 3: continue # not a valid function number
+            if 0 < input_num > 4: continue # not a valid function number
             selected["function"] = input_num
-            for line in xrange(2,5):
-                if line == selected["function"]+1: window.chgat(line, 3, 18, curses.A_STANDOUT)
-                else: window.chgat(line, 3, 18, curses.A_NORMAL)
+            for line in xrange(2,6):
+                if line == selected["function"]+1: window.chgat(line, 3, 20, curses.A_STANDOUT)
+                else: window.chgat(line, 3, 20, curses.A_NORMAL)
         elif x in source_letters[:len(queues)]:
             selected["inqueue"] = x
             for line in xrange(2,len(queues)+2):
@@ -446,12 +461,26 @@ def dump_queue(src):
     try:
         items = r.lrange(src,0,-1)
         with open("/tmp/%s.queue"%src, 'w') as outfile:
-            outfile.writelines(["%s\n"%json.dumps(item) for item in items])
+            outfile.writelines(["%s\n"%item for item in items])
         return True
     except:
         return False
 
-
+def load_queue(dest):
+    loaded = 0
+    try:
+        #items = r.lrange(src,0,-1)
+        with open("/tmp/%s.queue"%dest, 'r') as infile:
+            lines = infile.readlines()
+            for line in lines:
+                r.lpush(dest,line)
+                loaded += 1
+        return loaded
+    except IOError:
+        show_alert("File /tmp/%s.queue not found!"%dest)
+        return False
+    except:
+        return False
 
 if __name__ == "__main__":
     try:

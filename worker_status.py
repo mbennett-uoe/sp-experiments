@@ -243,7 +243,7 @@ def manage_workers():
                     # faster (than) ps+cat, kill kill kill!
                     try:
                         os.kill(workers[selected-1][1],9) # send hup - nope, not good enough, time for sigkill
-                        time.sleep(1)
+                        time.sleep(1) # wait a second for process to spawn and then reload the window
                         return True # action taken
                     except:
                         show_alert("Kill attempt failed")
@@ -479,7 +479,12 @@ if __name__ == "__main__":
                 elif char == "w":
                     while manage_workers():
                         del_window("wmanage")
-                        #manage_workers()
+                        # manage_workers returns true if an action has occured (i.e a window update is needed)
+                        # deleting and respawning the window is actually slightly less hassle than building an extra
+                        # refresh loop inside the window management, since it is only performing simple tasks
+                        # therefore, we loop the function until it returns False (i.e window was exited by user)
+                        # After each True response, we delete the window and let the next iteration of the loop respawn
+                        # it with fresh data.
                 elif char == "m": manage_queues()
                 else: handle_keypress(char)
 

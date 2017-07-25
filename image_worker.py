@@ -16,8 +16,17 @@ queues = {"read":"images:to_process",
           "work":"images:in_progress",
           "error":"images:errors"
           }
-status = "status:image_worker"
-pid = "pid:image_worker"
+
+# was worker started with an id number?
+if len(sys.argv) > 1 and sys.argv[1] == "-n" and int(sys.argv[2]) > 0:
+    # TODO: Check if a worker with the same ID already exists! Ideally the supervisor would handle this, but a
+    #       failsafe here is probably a good idea.
+    worker_id = "_%s"%sys.argv[2]
+else:
+    worker_id = ""
+
+status = "status:image_worker" + worker_id
+pid = "pid:image_worker" + worker_id
 
 wait_seconds =15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty

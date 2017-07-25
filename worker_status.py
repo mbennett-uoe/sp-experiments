@@ -56,9 +56,9 @@ def draw_initial_windows():
         "queues" : spawn_window(12, 40, 0, 40, "Queues"),
         "commands": spawn_window(12, 40, 0, 80, "Commands"),
         # below that
-        "worker_messages" : spawn_window(8, 120, 12, 0, "Worker status"),
+        "worker_messages" : spawn_window(16, 120, 12, 0, "Worker status"),
         # below that
-        "errors" : spawn_window(30, 120, 20, 0, "Most recent errors"),
+        "errors" : spawn_window(30, 120, 28, 0, "Most recent errors"),
     }
 
     # spawn a panel object with the same id for each window, so we can stack them nicely rather than farting about

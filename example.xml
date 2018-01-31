@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<object shelfmark="<shelfmark>" index="<work_subset_index>">
+    <item sequence="<sequence>">
+        <title>Case XXX, Page YYY</title>
+        <image type="jpg">path</image>
+        <image type="tiff">path</image>
+        <ocr type="firstpass" languange="<[enm|eng]>">path</ocr>
+        <ocr type="processed" languange="<[enm|eng]>">path</ocr>
+        <log>
+            <entry timestamp="<datetime>">
+                <process>worker_name</process>
+                <status>status text</status>
+            </entry>
+        </log>
+    </item>
+</object>

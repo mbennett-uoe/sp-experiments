@@ -1,0 +1,52 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="object">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="item">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:string" name="title"/>
+              <xs:element name="image" maxOccurs="unbounded" minOccurs="0">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="type" use="required"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="ocr" maxOccurs="unbounded" minOccurs="0">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="type" use="required"/>
+                      <xs:attribute type="xs:string" name="language" use="required"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="log">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="entry">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element type="xs:string" name="process"/>
+                          <xs:element type="xs:string" name="status"/>
+                        </xs:sequence>
+                        <xs:attribute type="xs:dateTime" name="timestamp"/>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute type="xs:string" name="sequence"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute type="xs:string" name="shelfmark"/>
+      <xs:attribute type="xs:string" name="index"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

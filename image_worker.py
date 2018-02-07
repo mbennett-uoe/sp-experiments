@@ -20,7 +20,7 @@ queues = {"read":"images:to_process",
 status = "status:image_worker"
 pid = "pid:image_worker"
 
-output_path = "./output/"
+output_path = "./output/images/"
 
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
@@ -72,6 +72,8 @@ while not should_exit:
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
+            tree = addlog(tree, item["sequence"], "image_worker", "No origin image file")
+            writetree(item["shelfmark"],item["index"],tree)
             continue
 
         # Does the desired input file exist?
@@ -81,6 +83,8 @@ while not should_exit:
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
+            tree = addlog(tree, item["sequence"], "image_worker", "Input origin image file does not exist")
+            writetree(item["shelfmark"], item["index"], tree)
             continue
 
         outfile = origin.replace(".jpg", ".crop.png")

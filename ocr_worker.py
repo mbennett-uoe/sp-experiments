@@ -7,6 +7,8 @@ from time import sleep
 from redis import Redis
 from PIL import Image
 import pyocr
+from xml_handler import gettree, getorigin, getimage, addocr, addlog, writetree
+
 #from logging import Logger
 
 r = Redis()
@@ -20,6 +22,8 @@ queues = {"read":"ocr:to_process",
 
 status = "status:ocr_worker"
 pid = "pid:ocr_worker"
+
+output_path = "./output/ocr/"
 
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
@@ -64,18 +68,30 @@ while not should_exit:
             r.lrem(queues["work"], json_item)
             continue
         # Do we have the data we need?
-        if "infile" not in item or "outpath" not in item:
+        if not item["shelfmark"] or not item["index"] or not item["sequence"]:
             # Well, this is awkward! If I'm the only one populating the queue, I would hope that we should
             # never end up here unless I've done something monumentally stupid, but better safe than sorry!
-            error = {"error":"Missing required data",
+            error = {"error":"Missing shelfmark, index or sequence",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             continue
+
+        # Does our item have an xml file with a valid cropped image?
+        tree = gettree(item["shelfmark"], item["index"])  # This will always return a valid ET, so no check needed
+        crop = getimage(tree, item["sequence"], "crop")
+        if not crop:
+            error = {"error": "No cropped image file",
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
+            continue
+
         # Does the desired input file exist?
-        if not os.path.isfile(item["infile"]):
-            error = {"error": "Input file does not exist",
+        if not os.path.isfile(crop):
+            error = {"error": "Input cropped image file does not exist",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))

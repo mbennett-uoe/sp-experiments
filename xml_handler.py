@@ -136,6 +136,13 @@ def addocr(tree, sequence, type, language, path):
 
     return tree
 
+def getimage(tree, sequence, type):
+    item = tree.find("./item[@sequence='%s']/image[@type='%s']" % (sequence, type))
+    if item is None:
+        return None
+    else:
+        return item.text
+
 def getorigin(tree, sequence):
     item = tree.find("./item[@sequence='%s']/origin" % sequence)
     if item is None:

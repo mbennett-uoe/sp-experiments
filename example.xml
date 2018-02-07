@@ -2,6 +2,7 @@
 <object shelfmark="ML00001" index="00002">
     <item sequence="9">
         <title>Case 00002, Page 9</title>
+        <origin>images/examplein/origin.jpg</origin>
         <image type="jpg">images/jpg/290/134663395c.jpg</image>
         <image type="tiff">images/tiff/134663395.tiff</image>
         <ocr type="firstpass" languange="eng">ocr/ML00001/134663395c.eng.txt</ocr>

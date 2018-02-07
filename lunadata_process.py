@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 '''Extract Session Papers data from Luna and make some case files'''
-import sys, requests, os
+import sys, requests, os, json
 from moonsun_miner import luna_login, solr_query
-
+from xml_handler import gettree, additem, writetree
 # Let's get the data!
 # Start by logging into Luna
 s = requests.Session()
@@ -25,6 +25,8 @@ sort = ['work_shelfmark_sortable asc', # Volume
         'work_subset_index_sortable asc', # Case in Volume
         'sequence_sortable asc' # Page in Case
         ]
+
+imagedir = "/var/images/"
 
 # Ok here we go!
 results = solr_query(s, query, fields=fields, sort=sort)
@@ -83,6 +85,29 @@ with open('lunadata.csv2', 'w') as outfile:
     writer = csv.DictWriter(outfile, fieldnames=fields)
     writer.writeheader()
     writer.writerows(new_results)
+
+# state trackers to enable i/o efficiency
+t = None
+curr_shelf = None
+curr_index = None
+for r in new_results:
+    # for efficiency, don't bother closing and writing the tree until all pages are processed
+    if r["work_shelfmark"] != curr_shelf or r["work_subset_index"] != curr_index:
+        if t: writetree(curr_shelf, curr_index, t)
+        # update state trackers and refresh tree object
+        curr_shelf = r["work_shelfmark"]
+        curr_index = r["work_subset_index"]
+        t = gettree(r["work_shelfmark"], r["work_subset_index"])
+
+    origin = imagedir + r["filepath"]
+    t = additem(t, r["sequence"], title=r["repro_title"], origin=origin)
+    json_item = json.dumps({"shelfmark": r["workshelfmark"],
+                            "index": r["work_subset_index"],
+                            "sequence": r["sequence"]})
+    r.lpush("images:to_process", json_item)
+
+
+
 
 
 # ok, lets see if we can actually find the media files!

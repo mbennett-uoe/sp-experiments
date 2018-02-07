@@ -20,8 +20,17 @@ queues = {"read":"ocr:to_process",
           "error":"ocr:errors"
           }
 
-status = "status:ocr_worker"
-pid = "pid:ocr_worker"
+# was worker started with an id number?
+if len(sys.argv) > 1 and sys.argv[1] == "-n" and int(sys.argv[2]) > 0:
+    # TODO: Check if a worker with the same ID already exists! Ideally the supervisor would handle this, but a
+    #       failsafe here is probably a good idea.
+    worker_id = "_%s"%sys.argv[2]
+else:
+    worker_id = ""
+
+
+status = "status:ocr_worker" + worker_id
+pid = "pid:ocr_worker" + worker_id
 
 output_path = "./output/ocr/"
 

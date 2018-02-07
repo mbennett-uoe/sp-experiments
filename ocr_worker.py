@@ -7,6 +7,8 @@ from time import sleep
 from redis import Redis
 from PIL import Image
 import pyocr
+from xml_handler import gettree, getimage, addocr, addlog, writetree
+
 #from logging import Logger
 
 r = Redis()
@@ -20,6 +22,8 @@ queues = {"read":"ocr:to_process",
 
 status = "status:ocr_worker"
 pid = "pid:ocr_worker"
+
+output_path = "./output/ocr/"
 
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
@@ -64,31 +68,48 @@ while not should_exit:
             r.lrem(queues["work"], json_item)
             continue
         # Do we have the data we need?
-        if "infile" not in item or "outpath" not in item:
+        if not item["shelfmark"] or not item["index"] or not item["sequence"]:
             # Well, this is awkward! If I'm the only one populating the queue, I would hope that we should
             # never end up here unless I've done something monumentally stupid, but better safe than sorry!
-            error = {"error":"Missing required data",
+            error = {"error":"Missing shelfmark, index or sequence",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             continue
-        # Does the desired input file exist?
-        if not os.path.isfile(item["infile"]):
-            error = {"error": "Input file does not exist",
+
+        # Does our item have an xml file with a valid cropped image?
+        tree = gettree(item["shelfmark"], item["index"])  # This will always return a valid ET, so no check needed
+        crop = getimage(tree, item["sequence"], "crop")
+        if not crop:
+            error = {"error": "No cropped image file",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
+            tree = addlog(tree, item["sequence"], "ocr_worker", "No cropped image file")
+            writetree(item["shelfmark"], item["index"], tree)
+            continue
+
+        # Does the desired input file exist?
+        if not os.path.isfile(crop):
+            error = {"error": "Input cropped image file does not exist",
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
+            tree = addlog(tree, item["sequence"], "ocr_worker", "Cropped image file does not exist")
+            writetree(item["shelfmark"], item["index"], tree)
             continue
         # Does the proposed output directory exist?
-        if not os.path.isdir(item["outpath"]):
+        if not os.path.isdir(output_path):
             error = {"error": "Output path is not a directory",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             continue
+
         if "dicts" not in item: item["dicts"] = tesseract_dicts
         # Is the proposed list of tesseract dictionaries actually a list?
         if not isinstance(item["dicts"], list):
@@ -108,14 +129,19 @@ while not should_exit:
             else:
                 dicts = item["dicts"]
 
-            image = Image.open(item["infile"])
+            image = Image.open(crop)
             for dict in dicts:
                 image_text = tess.image_to_string(image, lang=dict, builder=pyocr.builders.TextBuilder())
                 #word_boxes = tess.image_to_string(image, lang=dict, builder=pyocr.builders.WordBoxBuilder())
                 #line_boxes = tess.image_to_string(image, lang=dict, builder=pyocr.builders.LineBoxBuilder())
                 inf = item["infile"].split("/")[-1]
-                with codecs.open(item["outpath"] + inf + "-" + dict + "-" + "text.txt", 'w', encoding='utf-8') as f:
+                outfile = output_path + inf + "-" + dict + "-" + "text.txt"
+                with codecs.open(outfile, 'w', encoding='utf-8') as f:
                     pyocr.builders.TextBuilder().write_file(f, image_text)
+
+                tree = addocr(tree, item["sequence"], "crop-firstpass", dict, outfile)
+                tree = addlog(tree, item["sequence"], "ocr_worker",
+                              "Successfully created first pass %s OCR on cropped image"%dict)
                 #with codecs.open(item["outpath"] + inf + "-" + dict + "-" + "words.txt", 'w', encoding='utf-8') as f:
                 #    pyocr.builders.WordBoxBuilder().write_file(f, word_boxes)
                 #with codecs.open(item["outpath"] + inf + "-" + dict + "-" + "lines.txt", 'w', encoding='utf-8') as f:
@@ -124,6 +150,7 @@ while not should_exit:
             #process_image(item["infile"], item["outfile"])
             # if this didn't error out to the except block, we can assume process complete
             # write to complete, remove from in progress
+
             r.rpush(queues["write"], json_item)
             r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
@@ -136,8 +163,11 @@ while not should_exit:
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
+            tree = addlog(tree, item["sequence"], "image_worker", "Error creating OCR: " % str(e))
             r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
+        finally:
+            writetree(item["shelfmark"], item["index"], tree)
     else:
         if exit_when_empty:
             r.set(status, "%s: Terminated due to empty queue"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))

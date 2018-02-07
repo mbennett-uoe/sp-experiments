@@ -6,6 +6,7 @@ from datetime import datetime
 from time import sleep
 from redis import Redis
 from sp_crop import process_image
+from xml_handler import gettree, getorigin, addimage, addlog, writetree
 #from logging import Logger
 
 r = Redis()
@@ -19,7 +20,9 @@ queues = {"read":"images:to_process",
 status = "status:image_worker"
 pid = "pid:image_worker"
 
-wait_seconds =15 # How long to sleep for if no items in the queue
+output_path = "./output/images/"
+
+wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
 wait_maxseconds = 900 # What stage to stop increasing the wait time
 exit_when_empty = False
@@ -49,38 +52,61 @@ while not should_exit:
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             continue
-        # Do we have the two bits of data we need?
-        if not item["infile"] or not item["outfile"]:
+        # Do we have the three bits of data we need?
+        if not item["shelfmark"] or not item["index"] or not item["sequence"]:
             # Well, this is awkward! If I'm the only one populating the queue, I would hope that we should
             # never end up here unless I've done something monumentally stupid, but better safe than sorry!
-            error = {"error":"Missing in or out file name(s)",
+            error = {"error":"Missing shelfmark, index or sequence",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             continue
+
+        # Does our item have an xml file with a valid origin?
+        tree = gettree(item["shelfmark"], item["index"]) # This will always return a valid ET, so no check needed
+        origin = getorigin(tree, item["sequence"])
+        if not origin:
+            error = {"error": "No origin image file",
+                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
+                     "data": item}
+            r.lpush(queues["error"], json.dumps(error))
+            r.lrem(queues["work"], json_item)
+            tree = addlog(tree, item["sequence"], "image_worker", "No origin image file")
+            writetree(item["shelfmark"],item["index"],tree)
+            continue
+
         # Does the desired input file exist?
-        if not os.path.isfile(item["infile"]):
-            error = {"error": "Input file does not exist",
+        if not os.path.isfile(origin):
+            error = {"error": "Input origin file does not exist",
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
+            tree = addlog(tree, item["sequence"], "image_worker", "Input origin image file does not exist")
+            writetree(item["shelfmark"], item["index"], tree)
             continue
-        # Does the proposed output file exist? If so, and the overwrite flag is not set, it's a problem!
-        if os.path.isfile(item["outfile"]) and "overwrite" not in item:
-            error = {"error": "Output file exists and overwrite flag not set",
-                     "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
-                     "data": item}
-            r.lpush(queues["error"], json.dumps(error))
-            r.lrem(queues["work"], json_item)
-            continue
+
+        outfile = origin.replace(".jpg", ".crop.png")
+        # Does the proposed output file exist? Uncomment this block to error here if you don't want to overwrite
+        # if os.path.isfile(outfile):
+        #     error = {"error": "Output file exists",
+        #              "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
+        #              "data": item}
+        #     r.lpush(queues["error"], json.dumps(error))
+        #     r.lrem(queues["work"], json_item)
+        #     continue
+
+
         # ok, so at this point everything should be cool, let's try and process the image
         try:
             #print("Calling the image processor...")
-            r.set(status,"%s: Processing %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),item["infile"]))
-            process_image(item["infile"], item["outfile"])
+            r.set(status,"%s: Processing %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),origin))
+            process_image(origin, outfile)
             # if this didn't error out to the except block, we can assume process complete
+            # add the new image to the xml file
+            tree = addimage(tree, item["sequence"], "crop", outfile)
+            tree = addlog(tree, item["sequence"], "image_worker", "Successfully created initial cropped image")
             # write to complete, remove from in progress
             r.rpush(queues["write"], json_item)
             r.lrem(queues["work"], json_item)
@@ -94,8 +120,11 @@ while not should_exit:
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
+            tree = addlog(tree, item["sequence"], "image_worker", "Error creating cropped image: "%str(e))
             r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work" % datetime.now().strftime("%d/%m/%y %H:%M:%S"))
+        finally:
+            writetree(item["shelfmark"],item["index"], tree)
     else:
         if exit_when_empty:
             r.set(status, "%s: Terminated due to empty queue"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))

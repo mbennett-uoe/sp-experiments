@@ -68,11 +68,15 @@ def createtree(shelfmark, index):
     return doc
 
 
-def additem(tree, sequence, title = None):
+def additem(tree, sequence, title = None, origin = None):
     item = ET.Element('item', {"sequence": sequence})
     if title:
         t = ET.Element('title')
         t.text = title
+        item.append(t)
+    if origin:
+        t = ET.Element('origin')
+        t.text = origin
         item.append(t)
     tree.append(item)
     return tree
@@ -100,7 +104,7 @@ def addlog(tree, sequence, process, message):
 def settitle(tree, sequence, title):
     item = tree.find("./item[@sequence='%s']" % sequence)
     if item is None:
-        tree = additem(tree, sequence, title)
+        tree = additem(tree, sequence, title = title)
     else:
         item.text = title
     return tree
@@ -132,4 +136,24 @@ def addocr(tree, sequence, type, language, path):
 
     return tree
 
+def getimage(tree, sequence, type):
+    item = tree.find("./item[@sequence='%s']/image[@type='%s']" % (sequence, type))
+    if item is None:
+        return None
+    else:
+        return item.text
 
+def getorigin(tree, sequence):
+    item = tree.find("./item[@sequence='%s']/origin" % sequence)
+    if item is None:
+        return None
+    else:
+        return item.text
+
+def setorigin(tree, sequence, origin):
+    item = tree.find("./item[@sequence='%s']/origin" % sequence)
+    if item is None:
+        tree = additem(tree, sequence, origin = origin)
+    else:
+        item.text = origin
+    return tree

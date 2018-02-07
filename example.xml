@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<object shelfmark="ML00001" index="00002">
+    <item sequence="9">
+        <title>Case 00002, Page 9</title>
+        <image type="jpg">images/jpg/290/134663395c.jpg</image>
+        <image type="tiff">images/tiff/134663395.tiff</image>
+        <ocr type="firstpass" languange="eng">ocr/ML00001/134663395c.eng.txt</ocr>
+        <ocr type="firstpass" languange="enm">ocr/ML00001/134663395c.enm.txt</ocr>
+        <ocr type="processed" languange="eng">ocr/ML00001/134663395c.eng.geoparsed.txt</ocr>
+        <log>
+            <entry timestamp="2018-02-01T00:02:03.888475">
+                <process>image_worker_2</process>
+                <status>Cropped image (images/jpg/290/134663395c.jpg) created</status>
+            </entry>
+            <entry timestamp="2018-02-01T00:03:31.435337">
+                <process>ocr_worker_4</process>
+                <status>First pass ENG generated</status>
+            </entry>
+            <entry timestamp="2018-02-01T00:03:57.295629">
+                <process>ocr_worker_4</process>
+                <status>First pass ENM generated</status>
+            </entry>
+            <entry timestamp="2018-02-01T00:04:13.560275">
+                <process>ocr_worker_1</process>
+                <status>Geoparsed output complete</status>
+            </entry>
+        </log>
+    </item>
+</object>

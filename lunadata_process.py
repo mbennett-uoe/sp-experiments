@@ -21,9 +21,9 @@ fields = ['work_shelfmark', # Volume
           'urlSize4' # We need something with image directory
           ]
 # Sort down hierarchically in Solr for efficiency
-sort = ['work_shelfmark asc', # Volume
-        'work_subset_index asc', # Case in Volume
-        'sequence asc' # Page in Case
+sort = ['work_shelfmark_sortable asc', # Volume
+        'work_subset_index_sortable asc', # Case in Volume
+        'sequence_sortable asc' # Page in Case
         ]
 
 # Ok here we go!
@@ -79,7 +79,7 @@ fields.remove("urlSize4")
 
 # Lets try writing a csv
 import csv
-with open('test.csv', 'w') as outfile:
+with open('lunadata.csv2', 'w') as outfile:
     writer = csv.DictWriter(outfile, fieldnames=fields)
     writer.writeheader()
     writer.writerows(new_results)
@@ -87,25 +87,26 @@ with open('test.csv', 'w') as outfile:
 
 # ok, lets see if we can actually find the media files!
 # for this test, we want a subset of pages for which both exist, so we can directly compare the OCR results
-jpg_prefix = "/home/mike/Projects/sp-experiments/images/UoE~1~1/"
-tiff_prefix = "/media/diu_projects/SessionPapers/0133000-0133999/Process/"
+#jpg_prefix = "/home/mike/Projects/sp-experiments/images/UoE~1~1/"
+#tiff_prefix = "/media/diu_projects/SessionPapers/0133000-0133999/Process/"
 
-subset_results = []
+# subset_results = []
+#
+# for item in new_results:
+#     jpg = jpg_prefix + item["filepath"]
+#     tiff = tiff_prefix + item["mediafileName"]
+#     if os.path.isfile(jpg) and os.path.isfile(tiff): subset_results.append(item)
+#
+# # lets see
+# print("Found %s results with both images"%len(subset_results))
+# #pprint(subset_results)
+# # dump to csv
+# import csv
+# with open('testable_luna_data.csv', 'w') as outfile:
+#     writer = csv.DictWriter(outfile, fieldnames=fields)
+#     writer.writeheader()
+#     writer.writerows(subset_results)
 
-for item in new_results:
-    jpg = jpg_prefix + item["filepath"]
-    tiff = tiff_prefix + item["mediafileName"]
-    if os.path.isfile(jpg) and os.path.isfile(tiff): subset_results.append(item)
-
-# lets see
-print("Found %s results with both images"%len(subset_results))
-#pprint(subset_results)
-# dump to csv
-import csv
-with open('testable_luna_data.csv', 'w') as outfile:
-    writer = csv.DictWriter(outfile, fieldnames=fields)
-    writer.writeheader()
-    writer.writerows(subset_results)
 
 
 

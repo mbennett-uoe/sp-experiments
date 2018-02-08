@@ -158,7 +158,7 @@ def get_workers():
     return pids
 
 def get_last_errors(num = 5):
-    redis_errors = r.scan(match="*:errors")[1]
+    redis_errors = r.scan(match="*:errors") #[1]
     errors = []
     if len(redis_errors) == 0: return []
     eq = int(num / len(redis_errors))

@@ -130,7 +130,7 @@ while not should_exit:
             continue
         # ok, so at this point everything should be cool, let's try and process the image
         try:
-            r.set(status, "%s: Processing %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),item["infile"]))
+            r.set(status, "%s: Processing %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),crop))
             #print("Running OCR...")
             # if no dictionaries specified, use all of them!
             if len(item["dicts"]) == 0:
@@ -143,7 +143,7 @@ while not should_exit:
                 image_text = tess.image_to_string(image, lang=dict, builder=pyocr.builders.TextBuilder())
                 #word_boxes = tess.image_to_string(image, lang=dict, builder=pyocr.builders.WordBoxBuilder())
                 #line_boxes = tess.image_to_string(image, lang=dict, builder=pyocr.builders.LineBoxBuilder())
-                inf = item["infile"].split("/")[-1]
+                inf = crop.split("/")[-1]
                 outfile = output_path + inf + "-" + dict + "-" + "text.txt"
                 with codecs.open(outfile, 'w', encoding='utf-8') as f:
                     pyocr.builders.TextBuilder().write_file(f, image_text)
@@ -172,7 +172,7 @@ while not should_exit:
                      "timestamp": datetime.now().strftime("%d/%m/%y %H:%M:%S"),
                      "data": item}
             r.lpush(queues["error"], json.dumps(error))
-            tree = addlog(tree, item["sequence"], "image_worker", "Error creating OCR: " % str(e))
+            tree = addlog(tree, item["sequence"], "image_worker", "Error creating OCR: %s"%e)
             r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
         finally:

@@ -3,6 +3,10 @@
 import sys, requests, os, json
 from moonsun_miner import luna_login, solr_query
 from xml_handler import gettree, additem, writetree
+from redis import Redis
+from datetime import datetime
+r = Redis()
+
 # Let's get the data!
 # Start by logging into Luna
 s = requests.Session()
@@ -26,10 +30,10 @@ sort = ['work_shelfmark_sortable asc', # Volume
         'sequence_sortable asc' # Page in Case
         ]
 
-imagedir = "/var/images/"
+imagedir = "./images/UoE~1~1/"
 
 # Ok here we go!
-results = solr_query(s, query, fields=fields, sort=sort)
+results = solr_query(s, query, fields=fields, sort=sort) #, limit=10)
 # So either we have results or moonsun_miner exited with error, so we can be  a bit lazy and not bother to check
 # the response before processing!!
 # (I know this is very bad program design, but I intend to properly module-ise moonsun_miner in the near future,
@@ -86,27 +90,45 @@ with open('lunadata.csv2', 'w') as outfile:
     writer.writeheader()
     writer.writerows(new_results)
 
+errors = open("lunadata_errors.log", "w")
+
 # state trackers to enable i/o efficiency
 t = None
 curr_shelf = None
 curr_index = None
-for r in new_results:
+for result in new_results:
+    if result.get("work_shelfmark") is None:
+	print "No shelfmark!!! %s"%result
+	errors.write("%s Missing Shelfmark. Record %s\n"%(datetime.now(), result))
+	continue
+    if result.get("work_subset_index") is None:
+        print "No case number!!! %s"%result
+        errors.write("%s Missing Case Number. Record %s\n"%(datetime.now(), result))
+	continue
     # for efficiency, don't bother closing and writing the tree until all pages are processed
-    if r["work_shelfmark"] != curr_shelf or r["work_subset_index"] != curr_index:
-        if t: writetree(curr_shelf, curr_index, t)
+    if result["work_shelfmark"] != curr_shelf or result["work_subset_index"] != curr_index:
+    	print "New case: %s - %s"%(result["work_shelfmark"], result["work_subset_index"])
+        if t is not None:
+	     print "Current tree object populated, writing to file"
+	     writetree(curr_shelf, curr_index, t)
         # update state trackers and refresh tree object
-        curr_shelf = r["work_shelfmark"]
-        curr_index = r["work_subset_index"]
-        t = gettree(r["work_shelfmark"], r["work_subset_index"])
-
-    origin = imagedir + r["filepath"]
-    t = additem(t, r["sequence"], title=r["repro_title"], origin=origin)
-    json_item = json.dumps({"shelfmark": r["workshelfmark"],
-                            "index": r["work_subset_index"],
-                            "sequence": r["sequence"]})
+        curr_shelf = result["work_shelfmark"]
+        curr_index = result["work_subset_index"]
+	print "Getting new tree"
+        t = gettree(result["work_shelfmark"], result["work_subset_index"])
+    print "Adding sequence %s" %result["sequence"]
+    origin = imagedir + result["filepath"]
+    t = additem(t, result["sequence"], title=result["repro_title"], origin=origin)
+    json_item = json.dumps({"shelfmark": result["work_shelfmark"],
+                            "index": result["work_subset_index"],
+                            "sequence": result["sequence"]})
     r.lpush("images:to_process", json_item)
 
-
+# write the last tree!
+print "Writing last tree"
+writetree(curr_shelf, curr_index, t)
+print "Writing error log"
+errors.close()
 
 
 

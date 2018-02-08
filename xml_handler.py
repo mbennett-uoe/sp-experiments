@@ -3,7 +3,7 @@ import os
 import re
 from time import sleep
 from datetime import datetime
-root_path = "./output/"
+root_path = "./output/xml/"
 
 def get_valid_filename(s):
     """
@@ -56,8 +56,11 @@ def gettree(shelfmark, index):
         tree = ET.parse(fh)
         tree = tree.getroot()
     except ET.ParseError:
-        print "parsing error = generating new file"
+#        print "parsing error = generating new file"
         tree = createtree(shelfmark, index)
+    except TypeError:
+	print "TypeError, gen new file"
+	tree = createtree(shelfmark,index)
 
     return tree
 

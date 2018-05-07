@@ -17,9 +17,9 @@ def get_valid_filename(s):
     s = str(s).strip().replace(' ', '_')
     return re.sub(r'(?u)[^-\w.]', '', s)
 
-def getfh(dir, filename, retry = False):
+def getfh(dir, subdir, filename, retry = False):
     dir = get_valid_filename(dir)
-    path = root_path + dir + "/" + filename + ".xml"
+    path = root_path + dir + "/" + subdir + "/" + filename + ".xml"
     if os.path.exists(root_path + dir):
         try:
             fh = open(path, "r+")
@@ -38,17 +38,17 @@ def getfh(dir, filename, retry = False):
         os.makedirs(root_path + dir)
         getfh(dir, filename)
 
-def writetree(shelfmark, index, tree):
+def writetree(shelfmark, index, sequence, tree):
     try:
-        fh = getfh(shelfmark, index)
+        fh = getfh(shelfmark, index, sequence)
         ET.ElementTree(tree).write(fh, encoding="UTF-8", xml_declaration=True)
         return True
     except Exception as e:
         print e
 
-def gettree(shelfmark, index):
+def gettree(shelfmark, index, sequence):
     try:
-        fh = getfh(shelfmark, index)
+        fh = getfh(shelfmark, index, sequence)
     except Exception as e:
         print e
 
@@ -57,14 +57,14 @@ def gettree(shelfmark, index):
         tree = tree.getroot()
     except ET.ParseError:
 #        print "parsing error = generating new file"
-        tree = createtree(shelfmark, index)
+        tree = createtree(shelfmark, index, sequence)
     except TypeError:
-	print "TypeError, gen new file"
-	tree = createtree(shelfmark,index)
+	    print "TypeError, gen new file"
+	    tree = createtree(shelfmark,index, sequence)
 
     return tree
 
-def createtree(shelfmark, index):
+def createtree(shelfmark, index, sequence):
     doc = ET.Element('object')
     doc.set('shelfmark', shelfmark)
     doc.set('index', index)

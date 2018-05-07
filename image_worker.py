@@ -29,7 +29,7 @@ else:
 status = "status:image_worker" + worker_id
 pid = "pid:image_worker" + worker_id
 
-output_path = "./output/images/"
+output_path = "./output/images"
 
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
@@ -73,7 +73,7 @@ while not should_exit:
             continue
 
         # Does our item have an xml file with a valid origin?
-        tree = gettree(item["shelfmark"], item["index"]) # This will always return a valid ET, so no check needed
+        tree = gettree(item["shelfmark"], item["index"], item["sequence"]) # This will always return a valid ET, so no check needed
         origin = getorigin(tree, item["sequence"])
         if not origin:
             error = {"error": "No origin image file",
@@ -82,7 +82,7 @@ while not should_exit:
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             tree = addlog(tree, item["sequence"], "image_worker", "No origin image file")
-            writetree(item["shelfmark"],item["index"],tree)
+            writetree(item["shelfmark"],item["index"],item["sequence"],tree)
             continue
 
         # Does the desired input file exist?
@@ -93,10 +93,13 @@ while not should_exit:
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             tree = addlog(tree, item["sequence"], "image_worker", "Input origin image file does not exist")
-            writetree(item["shelfmark"], item["index"], tree)
+            writetree(item["shelfmark"], item["index"], item["sequence"], tree)
             continue
 
         outfile = origin.replace(".jpg", ".crop.png")
+        outfile = outfile.split("/")[:-1]
+        outpath = "%s/%s/%s/%s"%(output_path, item["shelfmark"], item["index"], item["sequence"])
+        os.makedirs(outpath, exist_ok=True)
         # Does the proposed output file exist? Uncomment this block to error here if you don't want to overwrite
         # if os.path.isfile(outfile):
         #     error = {"error": "Output file exists",
@@ -111,10 +114,10 @@ while not should_exit:
         try:
             #print("Calling the image processor...")
             r.set(status,"%s: Processing %s"%(datetime.now().strftime("%d/%m/%y %H:%M:%S"),origin))
-            process_image(origin, outfile)
+            process_image(origin, outpath+outfile)
             # if this didn't error out to the except block, we can assume process complete
             # add the new image to the xml file
-            tree = addimage(tree, item["sequence"], "crop", outfile)
+            tree = addimage(tree, item["sequence"], "crop", outpath+outfile)
             tree = addlog(tree, item["sequence"], "image_worker", "Successfully created initial cropped image")
             # write to complete, remove from in progress
             r.rpush(queues["write"], json_item)
@@ -133,7 +136,7 @@ while not should_exit:
             r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work" % datetime.now().strftime("%d/%m/%y %H:%M:%S"))
         finally:
-            writetree(item["shelfmark"],item["index"], tree)
+            writetree(item["shelfmark"],item["index"], item["sequence"], tree)
     else:
         if exit_when_empty:
             r.set(status, "%s: Terminated due to empty queue"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))

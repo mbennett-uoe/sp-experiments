@@ -32,7 +32,7 @@ else:
 status = "status:ocr_worker" + worker_id
 pid = "pid:ocr_worker" + worker_id
 
-output_path = "./output/ocr/"
+output_path = "./output/ocr"
 
 wait_seconds = 15 # How long to sleep for if no items in the queue
 wait_modifier = 1 # Multiplier for wait_seconds if consecutive polls are empty
@@ -88,7 +88,7 @@ while not should_exit:
             continue
 
         # Does our item have an xml file with a valid cropped image?
-        tree = gettree(item["shelfmark"], item["index"])  # This will always return a valid ET, so no check needed
+        tree = gettree(item["shelfmark"], item["index"], item["sequence"])  # This will always return a valid ET, so no check needed
         crop = getimage(tree, item["sequence"], "crop")
         if not crop:
             error = {"error": "No cropped image file",
@@ -97,7 +97,7 @@ while not should_exit:
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             tree = addlog(tree, item["sequence"], "ocr_worker", "No cropped image file")
-            writetree(item["shelfmark"], item["index"], tree)
+            writetree(item["shelfmark"], item["index"], item["sequence"], tree)
             continue
 
         # Does the desired input file exist?
@@ -108,7 +108,7 @@ while not should_exit:
             r.lpush(queues["error"], json.dumps(error))
             r.lrem(queues["work"], json_item)
             tree = addlog(tree, item["sequence"], "ocr_worker", "Cropped image file does not exist")
-            writetree(item["shelfmark"], item["index"], tree)
+            writetree(item["shelfmark"], item["index"], item["sequence"], tree)
             continue
         # Does the proposed output directory exist?
         if not os.path.isdir(output_path):
@@ -144,7 +144,9 @@ while not should_exit:
                 #word_boxes = tess.image_to_string(image, lang=dict, builder=pyocr.builders.WordBoxBuilder())
                 #line_boxes = tess.image_to_string(image, lang=dict, builder=pyocr.builders.LineBoxBuilder())
                 inf = crop.split("/")[-1]
-                outfile = output_path + inf + "-" + dict + "-" + "text.txt"
+                outpath = "%s/%s/%s/%s/" % (output_path, item["shelfmark"], item["index"], item["sequence"])
+                os.makedirs(outpath, exist_ok=True)
+                outfile = outpath + inf + "-" + dict + "-" + "text.txt"
                 with codecs.open(outfile, 'w', encoding='utf-8') as f:
                     pyocr.builders.TextBuilder().write_file(f, image_text)
 
@@ -176,7 +178,7 @@ while not should_exit:
             r.lrem(queues["work"], json_item)
             r.set(status, "%s: Waiting for work"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))
         finally:
-            writetree(item["shelfmark"], item["index"], tree)
+            writetree(item["shelfmark"], item["index"], item["sequence"], tree)
     else:
         if exit_when_empty:
             r.set(status, "%s: Terminated due to empty queue"%datetime.now().strftime("%d/%m/%y %H:%M:%S"))

@@ -98,35 +98,37 @@ curr_shelf = None
 curr_index = None
 for result in new_results:
     if result.get("work_shelfmark") is None:
-	print "No shelfmark!!! %s"%result
-	errors.write("%s Missing Shelfmark. Record %s\n"%(datetime.now(), result))
-	continue
+	    print "No shelfmark!!! %s"%result
+	    errors.write("%s Missing Shelfmark. Record %s\n"%(datetime.now(), result))
+	    continue
     if result.get("work_subset_index") is None:
         print "No case number!!! %s"%result
         errors.write("%s Missing Case Number. Record %s\n"%(datetime.now(), result))
-	continue
+	    continue
     # for efficiency, don't bother closing and writing the tree until all pages are processed
-    if result["work_shelfmark"] != curr_shelf or result["work_subset_index"] != curr_index:
-    	print "New case: %s - %s"%(result["work_shelfmark"], result["work_subset_index"])
-        if t is not None:
-	     print "Current tree object populated, writing to file"
-	     writetree(curr_shelf, curr_index, t)
-        # update state trackers and refresh tree object
-        curr_shelf = result["work_shelfmark"]
-        curr_index = result["work_subset_index"]
-	print "Getting new tree"
-        t = gettree(result["work_shelfmark"], result["work_subset_index"])
+    #if result["work_shelfmark"] != curr_shelf or result["work_subset_index"] != curr_index:
+    	# print "New case: %s - %s"%(result["work_shelfmark"], result["work_subset_index"])
+     #    if t is not None:
+	#      print "Current tree object populated, writing to file"
+	#      writetree(curr_shelf, curr_index, t)
+     #    # update state trackers and refresh tree object
+     #    curr_shelf = result["work_shelfmark"]
+     #    curr_index = result["work_subset_index"]
+	print "Getting tree"
+    t = gettree(result["work_shelfmark"], result["work_subset_index"], result["sequence"])
     print "Adding sequence %s" %result["sequence"]
     origin = imagedir + result["filepath"]
     t = additem(t, result["sequence"], title=result["repro_title"], origin=origin)
+    print "Writing tree"
+    writetree(result["work_shelfmark"], result["work_subset_index"], result["sequence"], t)
     json_item = json.dumps({"shelfmark": result["work_shelfmark"],
                             "index": result["work_subset_index"],
                             "sequence": result["sequence"]})
     r.lpush("images:to_process", json_item)
 
 # write the last tree!
-print "Writing last tree"
-writetree(curr_shelf, curr_index, t)
+#print "Writing last tree"
+#writetree(curr_shelf, curr_index, t)
 print "Writing error log"
 errors.close()
 

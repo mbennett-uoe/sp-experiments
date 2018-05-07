@@ -17,7 +17,8 @@ if not luna_login(s):
 
 # Ok, logged in, let's grab the records
 query = 'mediaCollectionId:"UoE~1~1"' # Match all records in Scottish Session Papers collection
-fields = ['work_shelfmark', # Volume
+fields = ['work_record_id', # DIU work number
+          'work_shelfmark', # Volume
           'work_subset_index',  # Case Number
           'sequence', # Page number of image (in Case, not Volume!)
           'repro_title', # 'Case X, Page Y' - Useful for asserting data is correct?
